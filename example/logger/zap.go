@@ -2,11 +2,18 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/aivencs/magic-box/pkg/logger"
 )
 
 func main() {
+	/* example for error code */
+	logger.InitErrorCode()
+	erc := logger.GetErc(logger.DVERROR, "数据长度不足")
+	fmt.Println("erc: ", erc)
+
+	/* example for zap logger */
 	ctx := context.WithValue(context.Background(), "trace", "t00")
 	// 初始化日志对象
 	logger.InitLogger(ctx, logger.Zap, logger.Option{
