@@ -1,21 +1,11 @@
-// 如果你使用示例代码运行
-//
-// 请在 Consul 中准备对应的配置 spanic/dev:
-//
-// pre:
-//  parh: there-is-pre
-// runtime:
-//  path: there-is-runtime
-//
-// 然后启动 Consul 服务
-//
-// 最后运行示例代码即可
-package config
+package main
 
 import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/aivencs/magic-box/pkg/config"
 )
 
 type BindConf struct {
@@ -31,11 +21,11 @@ type BindRuntime struct {
 	Name string `json:"name"`
 }
 
-func ExampleConsulConf() {
+func main() {
 	ctx := context.Background()
 	bindConf := BindConf{} // 选择符合配置格式的结构体
 	// 初始化配置对象
-	InitConf(ctx, Consul, Option{
+	config.InitConf(ctx, config.Consul, config.Option{
 		Application: "spanic-test",
 		Env:         "dev",
 		Auth:        false,
