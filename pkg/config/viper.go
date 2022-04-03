@@ -16,6 +16,13 @@ import (
 	_ "github.com/spf13/viper/remote"
 )
 
+// 使用枚举限定配置选择
+type SupportType uint
+
+const (
+	Consul SupportType = iota + 1 // Consul 配置中心
+)
+
 const (
 	DEFAULT_WATCH_INTERVAL = 180                     // 默认的更新检查间隔
 	DEFAULT_HOST_CONSUL    = "http://localhost:8500" // Consul 服务默认地址
@@ -43,16 +50,6 @@ func GetConf() Conf {
 	return conf
 }
 
-// 为初始化限定支持的对象
-type Support struct {
-	Consul string
-}
-
-// 获取程序所支持的配置清单
-func GetSupport() Support {
-	return Support{Consul: "consul"}
-}
-
 // 配置初始化时所用参数
 type Option struct {
 	Auth        bool        `json:"auth" label:"是否鉴权" desc:"鉴权时启用Username和Password"`
@@ -68,7 +65,7 @@ type Option struct {
 }
 
 // 初始化配置对象
-func InitConf(ctx context.Context, name string, option Option) error {
+func InitConf(ctx context.Context, name SupportType, option Option) error {
 	c := ConfFactory(ctx, name, option)
 	if c == nil {
 		return errors.New("")
@@ -82,17 +79,17 @@ func InitConf(ctx context.Context, name string, option Option) error {
 }
 
 // 配置的抽象工厂
-func ConfFactory(ctx context.Context, name string, option Option) Conf {
-	support := GetSupport()
+func ConfFactory(ctx context.Context, name SupportType, option Option) Conf {
 	switch name {
-	case support.Consul:
+	case Consul:
 		return NewConsulConf(ctx, option)
 	default:
 		return NewConsulConf(ctx, option)
 	}
 }
 
-// 基于 Consul 的配置
+// Conf 结构体
+// 基于 Consul
 type ConsulConf struct {
 	Kernel *viper.Viper
 }
