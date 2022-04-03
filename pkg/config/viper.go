@@ -1,0 +1,143 @@
+// 此包支持本地配置文件、远端配置中心的读取与解析
+//
+// 支持的远端配置中心可通过 GetSupport 函数获得
+package config
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"sync"
+	"time"
+	"unicode/utf8"
+
+	"github.com/spf13/viper"
+	_ "github.com/spf13/viper/remote"
+)
+
+const (
+	DEFAULT_WATCH_INTERVAL = 180                     // 默认的更新检查间隔
+	DEFAULT_HOST_CONSUL    = "http://localhost:8500" // Consul 服务默认地址
+)
+
+var conf Conf // 定义全局配置对象
+var mutex = new(sync.Mutex)
+
+// 抽象接口
+type Conf interface {
+	PeriodicUpdate(ctx context.Context, option Option) // 定期更新
+}
+
+// 设置全局配置对象
+func SetConf(v Conf) {
+	mutex.Lock()
+	defer mutex.Unlock()
+	conf = v
+}
+
+// 获取全局配置对象
+func GetConf() Conf {
+	mutex.Lock()
+	defer mutex.Unlock()
+	return conf
+}
+
+// 为初始化限定支持的对象
+type Support struct {
+	Consul string
+}
+
+// 获取程序所支持的配置清单
+func GetSupport() Support {
+	return Support{Consul: "consul"}
+}
+
+// 配置初始化时所用参数
+type Option struct {
+	Auth        bool        `json:"auth" label:"是否鉴权" desc:"鉴权时启用Username和Password"`
+	Host        string      `json:"host" label:"路径" desc:"文件则填写文件路径" validate:"required"`
+	Application string      `json:"application" label:"应用名称" desc:"必须与远端配置名称相同" validate:"required"`
+	Env         string      `json:"env" label:"环境" desc:"推荐不同环境不同配置" validate:"required"`
+	Type        string      `json:"type" label:"类型" desc:"用于指定配置格式类型，例如yaml/json" validate:"required"`
+	Bind        interface{} `json:"bind" label:"用于映射配置的结构体" desc:"远端配置会被映射到结构体" validate:"required"`
+	Username    string      `json:"username" label:"用户名" desc:"需要鉴权时使用"`
+	Password    string      `json:"password" label:"密码" desc:"需要鉴权时使用"`
+	Update      bool        `json:"update" label:"是否自动更新配置" desc:"默认不自动更新"`
+	Interval    int         `json:"interval" label:"即时更新检查间隔" desc:"默认三分钟"`
+}
+
+// 初始化配置对象
+func InitConf(ctx context.Context, name string, option Option) error {
+	c := ConfFactory(ctx, name, option)
+	if c == nil {
+		return errors.New("")
+	}
+	SetConf(c)
+	// 根据参数选择是否开启即时更新
+	if option.Update {
+		go conf.PeriodicUpdate(ctx, option)
+	}
+	return nil
+}
+
+// 配置的抽象工厂
+func ConfFactory(ctx context.Context, name string, option Option) Conf {
+	support := GetSupport()
+	switch name {
+	case support.Consul:
+		return NewConsulConf(ctx, option)
+	default:
+		return NewConsulConf(ctx, option)
+	}
+}
+
+// 基于 Consul 的配置
+type ConsulConf struct {
+	Kernel *viper.Viper
+}
+
+// 创建基于Consul的配置对象
+func NewConsulConf(ctx context.Context, option Option) Conf {
+	// 根据参数调整
+	if utf8.RuneCountInString(option.Host) == 0 {
+		option.Host = DEFAULT_HOST_CONSUL
+	}
+	if option.Auth {
+		os.Setenv("CONSUL_HTTP_AUTH", fmt.Sprintf("%s:%s", option.Username, option.Password))
+	}
+	// 开始构建
+	vip := viper.New()
+	name := fmt.Sprintf("%s/%s", option.Application, option.Env)
+	vip.SetConfigType(option.Type)
+	vip.AddRemoteProvider("consul", option.Host, name)
+	// 获取远端配置并映射到结构体
+	err := vip.ReadRemoteConfig()
+	if err != nil {
+		return nil
+	}
+	if option.Bind != nil {
+		vip.Unmarshal(&option.Bind)
+	}
+	return &ConsulConf{Kernel: vip}
+}
+
+// 定期更新
+func (c *ConsulConf) PeriodicUpdate(ctx context.Context, option Option) {
+	if option.Interval == 0 {
+		option.Interval = DEFAULT_WATCH_INTERVAL
+	}
+	ticker := time.NewTicker(time.Second * time.Duration(option.Interval))
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			c.Kernel.WatchRemoteConfig()
+			if option.Bind != nil {
+				c.Kernel.Unmarshal(&option.Bind)
+			}
+		default:
+			continue
+		}
+	}
+}
