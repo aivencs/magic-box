@@ -1,6 +1,4 @@
 // 此包支持本地配置文件、远端配置中心的读取与解析
-//
-// 支持的远端配置中心可通过 GetSupport 函数获得
 package config
 
 import (
