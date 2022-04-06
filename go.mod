@@ -3,6 +3,7 @@ module github.com/aivencs/magic-box
 go 1.17
 
 require (
+	github.com/go-resty/resty/v2 v2.7.0
 	github.com/spf13/viper v1.10.1
 	go.uber.org/zap v1.17.0
 )
@@ -54,7 +55,7 @@ require (
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
-	golang.org/x/net v0.0.0-20211015210444-4f30a5c0130f // indirect
+	golang.org/x/net v0.0.0-20211029224645-99673261e6eb // indirect
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 // indirect
 	golang.org/x/sys v0.0.0-20211210111614-af8b64212486 // indirect
 	golang.org/x/text v0.3.7 // indirect
