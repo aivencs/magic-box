@@ -7,6 +7,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/aivencs/magic-box/pkg/validate"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -41,6 +42,11 @@ const DEFAULT_LEVEL = INFO
 var logger Logger
 var once sync.Once
 
+func init() {
+	ctx := context.WithValue(context.Background(), "trace", "init-for-logger")
+	validate.InitValidate(ctx, "validator", validate.Option{})
+}
+
 // 抽象接口
 type Logger interface {
 	Debug(ctx context.Context, message Message)
@@ -67,6 +73,10 @@ type Option struct {
 func InitLogger(ctx context.Context, name SupportType, option Option) error {
 	c := logger
 	var err error
+	message, err := validate.Work(ctx, option)
+	if err != nil {
+		return errors.New(message)
+	}
 	once.Do(func() {
 		c = LoggerFactory(ctx, name, option)
 		if c == nil {

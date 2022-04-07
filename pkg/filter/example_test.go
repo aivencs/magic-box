@@ -3,6 +3,7 @@ package filter
 import (
 	"context"
 	"fmt"
+	"log"
 )
 
 func ExampleBloomFilter() {
@@ -17,7 +18,10 @@ func ExampleBloomFilter() {
 		DB:       1,
 		Key:      "seeds",
 	}
-	InitFilter(ctx, BLOOM_FILTER, opt)
+	err := InitFilter(ctx, BLOOM_FILTER, opt)
+	if err != nil {
+		log.Fatal(err)
+	}
 	payload := "19619c9e08f0ed4cc147e211efa8c3fb"
 	res, err := Add(ctx, payload)
 	fmt.Println(res, err) // output: false nil

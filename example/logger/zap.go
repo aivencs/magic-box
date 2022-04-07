@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/aivencs/magic-box/pkg/logger"
 )
@@ -16,11 +17,14 @@ func main() {
 	/* example for zap logger */
 	ctx := context.WithValue(context.Background(), "trace", "t00")
 	// 初始化日志对象
-	logger.InitLogger(ctx, logger.Zap, logger.Option{
+	err := logger.InitLogger(ctx, logger.Zap, logger.Option{
 		Application: "zap-log",
 		Env:         "dev",
 		Label:       "detail",
 		Encode:      logger.Json})
+	if err != nil {
+		log.Fatal(err)
+	}
 	// 1
 	ctx = context.WithValue(context.Background(), "trace", "t01")
 	logger.Info(ctx, logger.Message{Text: "操作失败", Remark: "标题替代正文", Traceback: "按规则未找到正文",

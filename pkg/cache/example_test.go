@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"fmt"
+	"log"
 )
 
 func ExampleRedisCache() {
@@ -16,7 +17,10 @@ func ExampleRedisCache() {
 		Table:    "",
 		DB:       1,
 	}
-	InitCache(ctx, REDIS, opt)
+	err := InitCache(ctx, REDIS, opt)
+	if err != nil {
+		log.Fatal(err)
+	}
 	payload := "19619c9e08f0ed4cc147e211efa8c3f0"
 	r, err := cache.SetEx(ctx, payload, 1, 20)
 	fmt.Println(r, err) // output: OK nil

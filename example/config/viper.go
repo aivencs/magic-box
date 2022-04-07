@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/aivencs/magic-box/pkg/config"
@@ -25,7 +26,7 @@ func main() {
 	ctx := context.Background()
 	bindConf := BindConf{} // 选择符合配置格式的结构体
 	// 初始化配置对象
-	config.InitConf(ctx, config.Consul, config.Option{
+	err := config.InitConf(ctx, config.Consul, config.Option{
 		Application: "spanic-test",
 		Env:         "dev",
 		Auth:        false,
@@ -34,6 +35,9 @@ func main() {
 		Update:      true,
 		Interval:    10,
 	})
+	if err != nil {
+		log.Fatal(err)
+	}
 	// 使用方法
 	for i := 0; i < 1000; i++ {
 		fmt.Println("bind-", i, ": ", bindConf.Runtime.Name) // 直接访问

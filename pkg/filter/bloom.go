@@ -7,6 +7,7 @@ import (
 	"time"
 
 	redisbloom "github.com/RedisBloom/redisbloom-go"
+	"github.com/aivencs/magic-box/pkg/validate"
 	redigo "github.com/gomodule/redigo/redis"
 )
 
@@ -25,6 +26,11 @@ const (
 var filter Filter
 var once sync.Once
 
+func init() {
+	ctx := context.WithValue(context.Background(), "trace", "init-for-filter")
+	validate.InitValidate(ctx, "validator", validate.Option{})
+}
+
 // 抽象接口
 type Filter interface {
 	Exist(ctx context.Context, val string) (bool, error)
@@ -33,23 +39,27 @@ type Filter interface {
 
 // 初始化时所用参数
 type Option struct {
-	Host        string
-	Auth        bool
-	Username    string
-	Password    string
-	Database    string
-	Table       string
-	DB          int
-	MaxIdle     int
-	IdleTimeout time.Duration
-	MaxActive   int
-	Key         string
+	Host        string        `json:"host" label:"服务地址" validate:"required"`
+	Auth        bool          `json:"auth" label:"是否鉴权" desc:"默认不鉴权"`
+	Username    string        `json:"username" label:"用户名"`
+	Password    string        `json:"password" label:"密码"`
+	Database    string        `json:"database" label:"数据库"`
+	Table       string        `json:"table" label:"数据表"`
+	DB          int           `json:"db" label:"数据库"`
+	MaxIdle     int           `json:"max_idle" label:"最大空闲链接数"`
+	IdleTimeout time.Duration `json:"idle_timeout" label:"空闲超时时间"`
+	MaxActive   int           `json:"max_active" label:"最大链接数"`
+	Key         string        `json:"key" label:"键名"`
 }
 
 // 初始化对象
 func InitFilter(ctx context.Context, name SupportType, option Option) error {
 	var c = filter
 	var err error
+	message, err := validate.Work(ctx, option)
+	if err != nil {
+		return errors.New(message)
+	}
 	once.Do(func() {
 		c = FilterFactory(ctx, name, option)
 		if c == nil {
@@ -85,7 +95,7 @@ func NewBloomFilter(ctx context.Context, option Option) Filter {
 		MaxIdle:     option.MaxIdle,
 		IdleTimeout: option.IdleTimeout,
 		MaxActive:   option.MaxActive,
-		Wait:        true,
+		Wait:        true, // 连接池无空闲连接时等待
 		Dial: func() (redigo.Conn, error) {
 			c, err := redigo.Dial("tcp", option.Host)
 			if err != nil {

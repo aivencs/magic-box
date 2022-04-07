@@ -1,15 +1,21 @@
 package logger
 
-import "context"
+import (
+	"context"
+	"log"
+)
 
 func ExampleZapLogger() {
 	ctx := context.WithValue(context.Background(), "trace", "t00")
 	// 初始化日志对象
-	InitLogger(ctx, Zap, Option{
+	err := InitLogger(ctx, Zap, Option{
 		Application: "zap-log",
 		Env:         "dev",
 		Label:       "detail",
 		Encode:      Json})
+	if err != nil {
+		log.Fatal(err)
+	}
 	// 1
 	ctx = context.WithValue(context.Background(), "trace", "t01")
 	logger.Info(ctx, Message{Text: "操作失败", Remark: "标题替代正文", Traceback: "按规则未找到正文",

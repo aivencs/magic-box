@@ -10,6 +10,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/aivencs/magic-box/pkg/validate"
 	"github.com/spf13/viper"
 	_ "github.com/spf13/viper/remote"
 )
@@ -29,6 +30,11 @@ const (
 // 定义全局配置对象
 var conf Conf
 var once sync.Once
+
+func init() {
+	ctx := context.WithValue(context.Background(), "trace", "init-for-config")
+	validate.InitValidate(ctx, "validator", validate.Option{})
+}
 
 // 抽象接口
 type Conf interface {
@@ -53,6 +59,10 @@ type Option struct {
 func InitConf(ctx context.Context, name SupportType, option Option) error {
 	c := conf
 	var err error
+	message, err := validate.Work(ctx, option)
+	if err != nil {
+		return errors.New(message)
+	}
 	once.Do(func() {
 		c = ConfFactory(ctx, name, option)
 		if c == nil {

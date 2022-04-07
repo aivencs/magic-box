@@ -3,6 +3,7 @@ package validate
 import (
 	"context"
 	"fmt"
+	"log"
 )
 
 type Users struct {
@@ -28,6 +29,9 @@ func ExampleValidator() {
 		Content: "<a>aps<a>",
 	}
 	ctx := context.WithValue(context.Background(), "trace", "v001")
-	InitValidate(ctx, "validator", Option{})
+	err := InitValidate(ctx, "validator", Option{})
+	if err != nil {
+		log.Fatal(err)
+	}
 	fmt.Println(validate.Work(ctx, users))
 }

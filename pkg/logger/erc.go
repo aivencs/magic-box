@@ -59,9 +59,6 @@ func GetDefaultErc() ErrorCode {
 
 func GetErc(code MessageCode, label string) ErrorCode {
 	value := erc[code]
-	// if ec == nil {
-	// 	ec = GetDefaultErc()
-	// }
 	if utf8.RuneCountInString(label) > 1 {
 		value.Label = label
 	}

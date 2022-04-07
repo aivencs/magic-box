@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/aivencs/magic-box/pkg/cache"
 )
@@ -18,7 +19,10 @@ func main() {
 		Table:    "",
 		DB:       1,
 	}
-	cache.InitCache(ctx, cache.REDIS, opt)
+	err := cache.InitCache(ctx, cache.REDIS, opt)
+	if err != nil {
+		log.Fatal(err)
+	}
 	payload := "19619c9e08f0ed4cc147e211efa8c3f0"
 	r, err := cache.SetEx(ctx, payload, 1, 20)
 	fmt.Println(r, err) // output: OK nil

@@ -3,6 +3,7 @@ package messenger
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -18,7 +19,10 @@ func ExampleRabbitMessenger() {
 		Heartbeat: 120,
 		Qos:       1,
 	}
-	InitMessenger(ctx, RABBIT, option)
+	err := InitMessenger(ctx, RABBIT, option)
+	if err != nil {
+		log.Fatal(err)
+	}
 	consumeObject, err := messenger.CreateConsume(ctx)
 	if err != nil {
 		fmt.Println(err)

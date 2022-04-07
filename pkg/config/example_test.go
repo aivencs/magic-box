@@ -15,6 +15,7 @@ package config
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -35,7 +36,7 @@ func ExampleConsulConf() {
 	ctx := context.Background()
 	bindConf := BindConf{} // 选择符合配置格式的结构体
 	// 初始化配置对象
-	InitConf(ctx, Consul, Option{
+	err := InitConf(ctx, Consul, Option{
 		Application: "spanic-test",
 		Env:         "dev",
 		Auth:        false,
@@ -44,6 +45,9 @@ func ExampleConsulConf() {
 		Update:      true,
 		Interval:    10,
 	})
+	if err != nil {
+		log.Fatal(err)
+	}
 	// 使用方法
 	for i := 0; i < 1000; i++ {
 		fmt.Println("bind-", i, ": ", bindConf.Runtime.Name) // 直接访问

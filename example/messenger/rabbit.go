@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/aivencs/magic-box/pkg/messenger"
@@ -20,7 +21,10 @@ func main() {
 		Heartbeat: 120,
 		Qos:       1,
 	}
-	messenger.InitMessenger(ctx, messenger.RABBIT, option)
+	err := messenger.InitMessenger(ctx, messenger.RABBIT, option)
+	if err != nil {
+		log.Fatal(err)
+	}
 	consumeObject, err := messenger.CreateConsume(ctx)
 	if err != nil {
 		fmt.Println(err)

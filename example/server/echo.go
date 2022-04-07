@@ -9,7 +9,7 @@ import (
 
 func main() {
 	ctx := context.WithValue(context.Background(), "trace", "v001")
-	err := server.InitServer(ctx, server.SERVER_ECHO, server.Option{Port: 98117, Host: "localhost"})
+	err := server.InitServer(ctx, server.SERVER_ECHO, server.Option{Port: 9817, Host: "localhost"})
 	if err != nil {
 		log.Fatal(err)
 	}
