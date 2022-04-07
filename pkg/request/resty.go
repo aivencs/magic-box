@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/aivencs/magic-box/pkg/validate"
 	"github.com/go-resty/resty/v2"
 )
 
@@ -20,15 +21,22 @@ type MethodType string
 
 const (
 	RESTY SupportType = "resty"
-	// method
+	// 限定请求方式
 	GET  MethodType = "GET"
 	POST MethodType = "POST"
+	// 定义默认值
+	DEFAULT_TIEOUT = 10
 )
 
 var once sync.Once
 
 // 定义全局请求对象
 var request Request
+
+func init() {
+	ctx := context.WithValue(context.Background(), "trace", "init-for-request")
+	validate.InitValidate(ctx, "validator", validate.Option{})
+}
 
 type Request interface {
 	Get(ctx context.Context, param Param) (Result, error)
@@ -46,7 +54,7 @@ type RestyRequest struct{}
 // 请求参数
 type Param struct {
 	Link             string     `json:"link" label:"网址" validate:"required,url"`
-	Method           MethodType `json:"method" label:"请求方式" validate:"required"`
+	Method           MethodType `json:"method" label:"请求方式"`
 	Payload          string     `json:"payload" label:"参数"`
 	Timeout          int        `json:"timeout" label:"超时时间"`
 	Proxy            string     `json:"proxy" label:"IP代理"`
@@ -102,14 +110,21 @@ func (c *RestyRequest) work(ctx context.Context, param Param) (Result, error) {
 	var result Result
 	var response *resty.Response
 	var err error
+	// 参数校验
+	message, err := validate.Work(ctx, param)
+	if err != nil {
+		return Result{}, errors.New(message)
+	}
+	// 前期准备
 	serviceSafeString, _ := url.Parse(param.Link)
 	client := resty.New()
 	// 设置追踪编码
 	client.SetHeaders(map[string]string{"X-REQUEST-ID": ctx.Value("trace").(string)})
 	// 参数项的应用
-	if param.Timeout > 0 {
-		client.SetTimeout(time.Duration(param.Timeout) * time.Second)
+	if param.Timeout == 0 {
+		param.Timeout = DEFAULT_TIEOUT
 	}
+	client.SetTimeout(time.Duration(param.Timeout) * time.Second)
 	if param.EnableSkipVerify {
 		client.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 	}
@@ -165,10 +180,12 @@ func (c *RestyRequest) work(ctx context.Context, param Param) (Result, error) {
 
 // 暴露给外部调用
 func Get(ctx context.Context, param Param) (Result, error) {
+	param.Method = GET
 	return request.Get(ctx, param)
 }
 
 // 暴露给外部调用
 func Post(ctx context.Context, param Param) (Result, error) {
+	param.Method = POST
 	return request.Get(ctx, param)
 }

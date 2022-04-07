@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/aivencs/magic-box/pkg/kit"
+	"github.com/aivencs/magic-box/pkg/validate"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -31,6 +32,11 @@ var server Server
 var once sync.Once
 var routerLabel map[string]string
 
+func init() {
+	ctx := context.WithValue(context.Background(), "trace", "init-for-server")
+	validate.InitValidate(ctx, "validator", validate.Option{})
+}
+
 type Server interface {
 	Work()
 	AddRouter(payload RouterPayload, h echo.HandlerFunc, m ...echo.MiddlewareFunc)
@@ -43,15 +49,18 @@ type EchoServer struct {
 }
 
 type Option struct {
-	Host               string
-	Port               int
-	DisableMiddCors    bool
-	DisableMiddRecover bool
+	Host               string `json:"host" label:"服务地址" desc:"默认为开放访问"`
+	Port               int    `json:"port" label:"端口号" validate:"required,min=3000,max=10000"`
+	DisableMiddCors    bool   `json:"disable_midd_cors" label:"cors中间件开关" desc:"默认开启"`
+	DisableMiddRecover bool   `json:"disable_midd_recover" label:"recover中间件开关" desc:"默认开启"`
 }
 
 func InitServer(ctx context.Context, name SupportType, option Option) error {
 	c := server
-	var err error
+	message, err := validate.Work(ctx, option)
+	if err != nil {
+		return errors.New(message)
+	}
 	once.Do(func() {
 		c = ServerFactory(ctx, name, option)
 		if c == nil {

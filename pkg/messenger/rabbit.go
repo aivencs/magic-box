@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aivencs/magic-box/pkg/validate"
 	"github.com/streadway/amqp"
 )
 
@@ -15,12 +16,19 @@ type SupportType string
 
 const (
 	RABBIT SupportType = "rabbitmq"
+	// 定义默认值
+	DEFAULT_QOS = 1
 )
 
 // 定义全局配置对象
 var messenger Messenger
 
 var once sync.Once
+
+func init() {
+	ctx := context.WithValue(context.Background(), "trace", "init-for-messenger")
+	validate.InitValidate(ctx, "validator", validate.Option{})
+}
 
 // 抽象接口
 type Messenger interface {
@@ -32,28 +40,31 @@ type Messenger interface {
 
 // 初始化时所用参数
 type Option struct {
-	Host      string
-	Auth      bool
-	Zone      string
-	Username  string
-	Password  string
-	Topic     Topic
-	Heartbeat int
-	Active    bool
-	Qos       int
+	Host      string `json:"host" label:"服务地址" validate:"required"`
+	Auth      bool   `json:"auth" label:"是否鉴权" desc:"默认不鉴权"`
+	Zone      string `json:"zone" label:"操作区" validate:"required"`
+	Username  string `json:"username" label:"用户名"`
+	Password  string `json:"password" label:"密码"`
+	Topic     Topic  `json:"topic" label:"topic" validate:"required"`
+	Heartbeat int    `json:"heartbeat" label:"心跳间隔"`
+	Qos       int    `json:"qos" label:"限流数"`
 }
 
 type SentPayload struct {
-	Topic    string
-	Message  string
-	Priority uint8
-	Channel  interface{}
+	Topic    string      `json:"topic" label:"生产主题" validate:"required"`
+	Message  string      `json:"message" label:"消息" validate:"required"`
+	Priority uint8       `json:"priority" label:"优先级" validate:"required"`
+	Channel  interface{} `json:"channel" label:"信道" validate:"required"`
 }
 
 // 初始化对象
 func InitMessenger(ctx context.Context, name SupportType, option Option) error {
 	var c = messenger
 	var err error
+	message, err := validate.Work(ctx, option)
+	if err != nil {
+		return errors.New(message)
+	}
 	once.Do(func() {
 		c = MessengerFactory(ctx, name, option)
 		if c == nil {
@@ -84,10 +95,10 @@ type RabbitMessenger struct {
 }
 
 type Topic struct {
-	Product string
-	Consume string
-	Bad     string
-	Forward string
+	Product string `json:"product" label:"生产主题" validate:"required"`
+	Consume string `json:"consume" label:"消费主题" validate:"required"`
+	Bad     string `json:"bad" label:"错误缓冲主题" validate:"required"`
+	Forward string `json:"forward" label:"转发主题" validate:"required"`
 }
 
 type RabbitConsume struct {
@@ -107,6 +118,9 @@ func NewRabbitMessenger(ctx context.Context, option Option) Messenger {
 	conn, err := amqp.DialConfig(address, conf)
 	if err != nil {
 		return nil
+	}
+	if option.Qos == 0 {
+		option.Qos = DEFAULT_QOS
 	}
 	return &RabbitMessenger{
 		Topic:   option.Topic,
