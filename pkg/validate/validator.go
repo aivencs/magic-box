@@ -20,7 +20,6 @@ const (
 
 // 定义全局配置对象
 var validate Validate
-var locker = new(sync.Mutex)
 var once sync.Once
 
 // 抽象接口
@@ -28,34 +27,21 @@ type Validate interface {
 	Work(ctx context.Context, payload interface{}) (string, error)
 }
 
-// 设置全局对象
-func SetValidate(v Validate) {
-	locker.Lock()
-	defer locker.Unlock()
-	validate = v
-}
-
-// 获取全局对象
-func GetValidate() Validate {
-	locker.Lock()
-	defer locker.Unlock()
-	return validate
-}
-
 // 初始化时所用参数
 type Option struct{}
 
 // 初始化对象
 func InitValidate(ctx context.Context, name SupportType, option Option) error {
-	var c = validate
+	c := validate
+	var err error
 	once.Do(func() {
 		c = ValidateFactory(ctx, name, option)
+		if c == nil {
+			err = errors.New("初始化失败")
+		}
+		validate = c
 	})
-	if c == nil {
-		return errors.New("初始化失败")
-	}
-	SetValidate(c)
-	return nil
+	return err
 }
 
 // 抽象工厂
@@ -145,6 +131,5 @@ func (c *TheValidator) Work(ctx context.Context, payload interface{}) (string, e
 }
 
 func Work(ctx context.Context, payload interface{}) (string, error) {
-	v := GetValidate()
-	return v.Work(ctx, payload)
+	return validate.Work(ctx, payload)
 }

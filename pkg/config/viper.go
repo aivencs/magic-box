@@ -26,26 +26,13 @@ const (
 	DEFAULT_HOST_CONSUL    = "http://localhost:8500" // Consul 服务默认地址
 )
 
-var conf Conf // 定义全局配置对象
-var mutex = new(sync.Mutex)
+// 定义全局配置对象
+var conf Conf
+var once sync.Once
 
 // 抽象接口
 type Conf interface {
 	PeriodicUpdate(ctx context.Context, option Option) // 定期更新
-}
-
-// 设置全局配置对象
-func SetConf(v Conf) {
-	mutex.Lock()
-	defer mutex.Unlock()
-	conf = v
-}
-
-// 获取全局配置对象
-func GetConf() Conf {
-	mutex.Lock()
-	defer mutex.Unlock()
-	return conf
 }
 
 // 配置初始化时所用参数
@@ -64,16 +51,16 @@ type Option struct {
 
 // 初始化配置对象
 func InitConf(ctx context.Context, name SupportType, option Option) error {
-	c := ConfFactory(ctx, name, option)
-	if c == nil {
-		return errors.New("")
-	}
-	SetConf(c)
-	// 根据参数选择是否开启即时更新
-	if option.Update {
-		go conf.PeriodicUpdate(ctx, option)
-	}
-	return nil
+	c := conf
+	var err error
+	once.Do(func() {
+		c = ConfFactory(ctx, name, option)
+		if c == nil {
+			err = errors.New("初始化失败")
+		}
+		conf = c
+	})
+	return err
 }
 
 // 配置的抽象工厂

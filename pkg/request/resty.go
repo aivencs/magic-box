@@ -26,26 +26,13 @@ const (
 )
 
 var once sync.Once
-var request Request // 定义全局请求对象
-var mutex = new(sync.Mutex)
+
+// 定义全局请求对象
+var request Request
 
 type Request interface {
 	Get(ctx context.Context, param Param) (Result, error)
 	Post(ctx context.Context, param Param) (Result, error)
-}
-
-// 设置全局请求对象
-func SetRequest(v Request) {
-	mutex.Lock()
-	defer mutex.Unlock()
-	request = v
-}
-
-// 获取全局请求对象
-func GetRequest() Request {
-	mutex.Lock()
-	defer mutex.Unlock()
-	return request
 }
 
 // 初始化时所用参数
@@ -53,7 +40,7 @@ type Option struct {
 }
 
 // 结构体
-// 基于 Resty
+// 基于Resty
 type RestyRequest struct{}
 
 // 请求参数
@@ -76,15 +63,16 @@ type Result struct {
 
 // 初始化对象
 func InitRequest(ctx context.Context, name SupportType, option Option) error {
-	var c = request
+	c := request
+	var err error
 	once.Do(func() {
 		c = RequestFactory(ctx, name, option)
+		if c == nil {
+			err = errors.New("初始化失败")
+		}
+		request = c
 	})
-	if c == nil {
-		return errors.New("初始化失败")
-	}
-	SetRequest(c)
-	return nil
+	return err
 }
 
 // 抽象工厂

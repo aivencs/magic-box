@@ -79,7 +79,6 @@ func MessengerFactory(ctx context.Context, name SupportType, option Option) Mess
 type RabbitMessenger struct {
 	Connect *amqp.Connection
 	Topic   Topic
-	rwMutex *sync.RWMutex
 	Qos     int
 	Channel *amqp.Channel
 }
@@ -112,7 +111,6 @@ func NewRabbitMessenger(ctx context.Context, option Option) Messenger {
 	return &RabbitMessenger{
 		Topic:   option.Topic,
 		Connect: conn,
-		rwMutex: new(sync.RWMutex),
 		Qos:     option.Qos,
 	}
 }

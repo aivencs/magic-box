@@ -37,8 +37,9 @@ const (
 const DEFAULT_CODE = SUCCESS
 const DEFAULT_LEVEL = INFO
 
-var logger Logger // 定义全局配置对象
-var mutex = new(sync.Mutex)
+// 定义全局配置对象
+var logger Logger
+var once sync.Once
 
 // 抽象接口
 type Logger interface {
@@ -47,20 +48,6 @@ type Logger interface {
 	Warn(ctx context.Context, message Message)
 	Error(ctx context.Context, message Message)
 	Fatal(ctx context.Context, message Message)
-}
-
-// 设置全局日志对象
-func SetLogger(v Logger) {
-	mutex.Lock()
-	defer mutex.Unlock()
-	logger = v
-}
-
-// 获取全局日志对象
-func GetLogger() Logger {
-	mutex.Lock()
-	defer mutex.Unlock()
-	return logger
 }
 
 type Field = zapcore.Field
@@ -78,12 +65,16 @@ type Option struct {
 
 // 初始化对象
 func InitLogger(ctx context.Context, name SupportType, option Option) error {
-	c := LoggerFactory(ctx, name, option)
-	if c == nil {
-		return errors.New("初始化失败")
-	}
-	SetLogger(c)
-	return nil
+	c := logger
+	var err error
+	once.Do(func() {
+		c = LoggerFactory(ctx, name, option)
+		if c == nil {
+			err = errors.New("初始化失败")
+		}
+		logger = c
+	})
+	return err
 }
 
 // 抽象工厂
