@@ -156,18 +156,46 @@ type bodyDumpResponseWriter struct {
 	http.ResponseWriter
 }
 
+// 请求结果
+type Result struct {
+	Text       string
+	StatusCode int
+	Response   interface{}
+	ErrorCode  logger.ErrorCode
+}
+
+func EmptyHandler(c echo.Context) error {
+	res := Result{
+		Text:       c.Get("message").(string),
+		StatusCode: 200,
+		Response:   nil,
+		ErrorCode:  logger.GetErc(logger.PVERROR, ""),
+	}
+	return c.JSONPretty(http.StatusOK, res, "")
+}
+
+type Header struct {
+	X_REQUEST_ID string `json:"X-REQUEST-ID" label:"追踪编码" validate:"required, min=16"`
+}
+
 // 日志中间件
 func LoggerMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) (err error) {
+		var header Header
 		label := server.GetRouterLabel(c.Request().URL.Path)
-		// 获取追踪编码
-		trace := ""
-		xREQUESTID := c.Request().Header.Values("X-REQUEST-ID")
-		if len(xREQUESTID) > 0 {
-			trace = xREQUESTID[0]
+		// 获取并校验追踪编码
+		ids := c.Request().Header.Values("X-REQUEST-ID")
+		if len(ids) > 0 {
+			header.X_REQUEST_ID = ids[0]
+		}
+		message, err := validate.Work(context.Background(), &header)
+		if err != nil {
+			c.Set("message", message)
+			EmptyHandler(c)
+			return
 		}
 		// 创建新的 Context
-		ctx := context.WithValue(context.Background(), "trace", trace)
+		ctx := context.WithValue(context.Background(), "trace", header.X_REQUEST_ID)
 		ctx = context.WithValue(ctx, "label", label)
 		// 拦截响应
 		responseBuffer := new(bytes.Buffer)
