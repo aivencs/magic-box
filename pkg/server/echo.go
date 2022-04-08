@@ -40,6 +40,7 @@ func init() {
 type Server interface {
 	Work()
 	AddRouter(payload RouterPayload, h echo.HandlerFunc, m ...echo.MiddlewareFunc)
+	GetRouterLabel(path string) string
 }
 
 type EchoServer struct {
@@ -127,10 +128,18 @@ func (c *EchoServer) AddRouter(payload RouterPayload, h echo.HandlerFunc, m ...e
 	routerLabel[payload.Path] = payload.Label
 }
 
+func (c *EchoServer) GetRouterLabel(path string) string {
+	return routerLabel[path]
+}
+
 func Work() {
 	server.Work()
 }
 
 func AddRouter(payload RouterPayload, h echo.HandlerFunc, m ...echo.MiddlewareFunc) {
 	server.AddRouter(payload, h, m...)
+}
+
+func GetRouterLabel(path string) string {
+	return server.GetRouterLabel(path)
 }
