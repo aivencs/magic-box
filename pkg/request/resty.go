@@ -5,10 +5,12 @@ import (
 	"crypto/tls"
 	"errors"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
 
+	"github.com/aivencs/magic-box/pkg/logger"
 	"github.com/aivencs/magic-box/pkg/validate"
 	"github.com/go-resty/resty/v2"
 )
@@ -36,6 +38,13 @@ var request Request
 func init() {
 	ctx := context.WithValue(context.Background(), "trace", "init-for-request")
 	validate.InitValidate(ctx, "validator", validate.Option{})
+	logger.InitErrorCode()
+	logger.InitLogger(ctx, logger.Zap, logger.Option{
+		Application: "ac",
+		Env:         "dev",
+		Encode:      logger.Json,
+		Label:       "request",
+	})
 }
 
 type Request interface {
@@ -67,6 +76,7 @@ type Result struct {
 	Text       string
 	StatusCode int
 	Response   interface{}
+	ErrorCode  logger.ErrorCode
 }
 
 // 初始化对象
@@ -107,6 +117,7 @@ func (c *RestyRequest) Post(ctx context.Context, param Param) (Result, error) {
 }
 
 func (c *RestyRequest) work(ctx context.Context, param Param) (Result, error) {
+	erc := logger.GetDefaultErc()
 	var result Result
 	var response *resty.Response
 	var err error
@@ -130,16 +141,17 @@ func (c *RestyRequest) work(ctx context.Context, param Param) (Result, error) {
 	}
 	if param.EnableHeader {
 		client.SetHeaders(map[string]string{
-			"Trace-ID":   ctx.Value("trace").(string),
-			"Host":       serviceSafeString.Host,
-			"Referer":    serviceSafeString.Host,
-			"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36",
+			"X-REQUEST-ID": ctx.Value("trace").(string),
+			"Host":         serviceSafeString.Host,
+			"Referer":      serviceSafeString.Host,
+			"User-Agent":   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36",
 		})
 	}
 	if utf8.RuneCountInString(param.Proxy) > 6 {
 		client.SetProxy(param.Proxy)
 	}
 	// 发出请求
+	startT := time.Now()
 	switch param.Method {
 	case GET:
 		response, err = client.R().SetBody(param.Payload).Get(param.Link)
@@ -151,23 +163,43 @@ func (c *RestyRequest) work(ctx context.Context, param Param) (Result, error) {
 	default:
 		response, err = client.R().SetBody(param.Payload).Get(param.Link)
 	}
+	duration := time.Since(startT).Milliseconds()
 	// 请求结果处理
 	if err != nil {
-		return result, err
+		erc := logger.GetErc(logger.DVERROR, "请求时发生错误")
+		if strings.Contains(err.Error(), "Client.Timeout ") {
+			erc = logger.GetErc(logger.TIMEOUT, "")
+		}
+		logger.Info(ctx, logger.Message{
+			Text:      erc.Label,
+			Label:     ctx.Value("label").(string),
+			Traceback: err.Error(),
+			Attr: logger.Attr{
+				Monitor: logger.Monitor{
+					Level:           erc.Level,
+					Code:            erc.Code,
+					ProcessDuration: duration,
+				},
+			},
+		})
+		return result, errors.New(erc.Label)
 	}
 	// 状态码处理
-	if response.RawResponse.StatusCode < 299 {
+	if response.RawResponse.StatusCode > 201 {
 		switch response.RawResponse.StatusCode {
 		case 429:
-			err = errors.New("并发超限")
+			erc = logger.GetErc(logger.LIMITERROR, "")
+			err = errors.New(erc.Label)
 		case 404:
-			err = errors.New("资源不存在")
+			erc = logger.GetErc(logger.CHECK, "资源不存在")
+			err = errors.New(erc.Label)
 		case 200:
 			err = nil
 		case 201:
 			err = nil
 		default:
-			err = errors.New("非正常状态码")
+			erc = logger.GetErc(logger.STATUSERROR, "")
+			err = errors.New(erc.Label)
 		}
 	}
 	// 构造结果并返回
@@ -175,6 +207,7 @@ func (c *RestyRequest) work(ctx context.Context, param Param) (Result, error) {
 		Text:       response.String(),
 		StatusCode: response.RawResponse.StatusCode,
 		Response:   response,
+		ErrorCode:  erc,
 	}, err
 }
 
