@@ -1,12 +1,19 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/aivencs/magic-box/pkg/kit"
+	"github.com/aivencs/magic-box/pkg/logger"
+	"github.com/aivencs/magic-box/pkg/request"
 	"github.com/aivencs/magic-box/pkg/validate"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -142,4 +149,73 @@ func AddRouter(payload RouterPayload, h echo.HandlerFunc, m ...echo.MiddlewareFu
 
 func GetRouterLabel(path string) string {
 	return server.GetRouterLabel(path)
+}
+
+type bodyDumpResponseWriter struct {
+	io.Writer
+	http.ResponseWriter
+}
+
+type Header struct {
+	X_REQUEST_ID string `json:"X-REQUEST-ID" label:"追踪编码" validate:"required"`
+}
+
+// 日志中间件
+func LoggerMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) (err error) {
+		header := Header{}
+		label := server.GetRouterLabel(c.Request().URL.Path)
+		// 获取或者构造追踪编码
+		xREQUESTID := c.Request().Header.Values("X-REQUEST-ID")
+		if len(xREQUESTID) > 0 {
+			header.X_REQUEST_ID = xREQUESTID[0]
+		}
+		// 校验参数
+		v, err := validate.Work(context.Background(), &header)
+		if err != nil {
+			return errors.New(v)
+		}
+		// 创建新的 Context
+		ctx := context.WithValue(context.Background(), "trace", header.X_REQUEST_ID)
+		ctx = context.WithValue(ctx, "label", label)
+		// 拦截响应
+		responseBuffer := new(bytes.Buffer)
+		mw := io.MultiWriter(c.Response().Writer, responseBuffer)
+		writer := &bodyDumpResponseWriter{Writer: mw, ResponseWriter: c.Response().Writer}
+		response := request.Result{}
+		c.Response().Writer = writer
+		// 函数调用
+		startT := time.Now()
+		err = next(c)
+		duration := time.Since(startT).Milliseconds()
+		// 解析响应内容
+		json.Unmarshal(responseBuffer.Bytes(), &response)
+		// 构建日志信息
+		logger.Info(ctx, logger.Message{
+			Text:  response.ErrorCode.Label,
+			Label: label,
+			Attr: logger.Attr{
+				Monitor: logger.Monitor{
+					Final:           true,
+					Level:           response.ErrorCode.Level,
+					ProcessDuration: duration,
+				},
+				Inp: map[string]interface{}{
+					"host":       c.Request().Host,
+					"path":       c.Path(),
+					"user-agent": c.Request().UserAgent(),
+					"method":     c.Request().Method,
+					"param":      c.Get("request"),
+				},
+				Oup: map[string]interface{}{
+					"status_code": c.Response().Status,
+				},
+			},
+		})
+		return
+	}
+}
+
+func (w *bodyDumpResponseWriter) Write(b []byte) (int, error) {
+	return w.Writer.Write(b)
 }
