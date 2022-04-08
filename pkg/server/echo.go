@@ -194,6 +194,9 @@ func LoggerMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 			EmptyHandler(c)
 			return
 		}
+		// 设置框架的Context
+		c.Set("trace", header.X_REQUEST_ID)
+		c.Set("label", label)
 		// 创建新的 Context
 		ctx := context.WithValue(context.Background(), "trace", header.X_REQUEST_ID)
 		ctx = context.WithValue(ctx, "label", label)
