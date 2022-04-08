@@ -37,7 +37,7 @@ const (
 
 var server Server
 var once sync.Once
-var routerLabel map[string]string
+var routerLabel = map[string]string{}
 
 func init() {
 	ctx := context.WithValue(context.Background(), "trace", "init-for-server")
