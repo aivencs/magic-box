@@ -156,27 +156,18 @@ type bodyDumpResponseWriter struct {
 	http.ResponseWriter
 }
 
-type Header struct {
-	X_REQUEST_ID string `json:"X-REQUEST-ID" label:"追踪编码" validate:"required"`
-}
-
 // 日志中间件
 func LoggerMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) (err error) {
-		header := Header{}
 		label := server.GetRouterLabel(c.Request().URL.Path)
-		// 获取或者构造追踪编码
+		// 获取追踪编码
+		trace := ""
 		xREQUESTID := c.Request().Header.Values("X-REQUEST-ID")
 		if len(xREQUESTID) > 0 {
-			header.X_REQUEST_ID = xREQUESTID[0]
-		}
-		// 校验参数
-		v, err := validate.Work(context.Background(), &header)
-		if err != nil {
-			return errors.New(v)
+			trace = xREQUESTID[0]
 		}
 		// 创建新的 Context
-		ctx := context.WithValue(context.Background(), "trace", header.X_REQUEST_ID)
+		ctx := context.WithValue(context.Background(), "trace", trace)
 		ctx = context.WithValue(ctx, "label", label)
 		// 拦截响应
 		responseBuffer := new(bytes.Buffer)
