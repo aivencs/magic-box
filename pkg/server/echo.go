@@ -130,3 +130,7 @@ func (c *EchoServer) AddRouter(payload RouterPayload, h echo.HandlerFunc, m ...e
 func Work() {
 	server.Work()
 }
+
+func AddRouter(payload RouterPayload, h echo.HandlerFunc, m ...echo.MiddlewareFunc) {
+	server.AddRouter(payload, h, m...)
+}
