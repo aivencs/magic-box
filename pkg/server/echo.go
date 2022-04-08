@@ -175,7 +175,7 @@ func EmptyHandler(c echo.Context) error {
 }
 
 type Header struct {
-	X_REQUEST_ID string `json:"X-REQUEST-ID" label:"追踪编码" validate:"required, min=16"`
+	X_REQUEST_ID string `json:"X-REQUEST-ID" label:"追踪编码" validate:"required,min=16"`
 }
 
 // 日志中间件
