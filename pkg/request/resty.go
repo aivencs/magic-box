@@ -122,14 +122,12 @@ func (c *RestyRequest) Post(ctx context.Context, param Param) (Result, error) {
 }
 
 func (c *RestyRequest) work(ctx context.Context, param Param) (Result, error) {
-	erc := logger.GetDefaultErc()
-	var result Result
 	var response *resty.Response
 	var err error
 	// 参数校验
 	message, err := validate.Work(ctx, param)
 	if err != nil {
-		return Result{}, errors.New(message)
+		return Result{ErrorCode: logger.GetErc(logger.PVERROR, "")}, errors.New(message)
 	}
 	// 前期准备
 	serviceSafeString, _ := url.Parse(param.Link)
@@ -187,9 +185,10 @@ func (c *RestyRequest) work(ctx context.Context, param Param) (Result, error) {
 				},
 			},
 		})
-		return result, errors.New(erc.Label)
+		return Result{ErrorCode: erc}, errors.New(erc.Label)
 	}
 	// 状态码处理
+	erc := logger.GetDefaultErc()
 	if response.RawResponse.StatusCode > 201 {
 		switch response.RawResponse.StatusCode {
 		case 429:
