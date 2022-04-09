@@ -167,8 +167,8 @@ type Header struct {
 	X_REQUEST_ID string `json:"X-REQUEST-ID" label:"追踪编码" validate:"required,min=16,max=100"`
 }
 
-// 日志中间件
-func LoggerMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
+// 基础日志中间件
+func loggerBase(next echo.HandlerFunc, inp bool, oup bool) echo.HandlerFunc {
 	return func(c echo.Context) (err error) {
 		var header Header
 		startT := time.Now()
@@ -204,6 +204,21 @@ func LoggerMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 		}
 		duration := time.Since(startT).Milliseconds()
 		// 构建日志信息
+		input := map[string]interface{}{
+			"host":       c.Request().Host,
+			"path":       c.Path(),
+			"user-agent": c.Request().UserAgent(),
+			"method":     c.Request().Method,
+		}
+		output := map[string]interface{}{
+			"status_code": c.Response().Status,
+		}
+		if inp {
+			input["param"] = c.Request()
+		}
+		if oup {
+			output["response"] = response
+		}
 		logger.Info(ctx, logger.Message{
 			Text:  response.Message,
 			Label: c.Request().URL.Path,
@@ -214,21 +229,22 @@ func LoggerMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 					Code:            response.Code,
 					Level:           logger.GetErc(response.Code, "").Level,
 				},
-				Inp: map[string]interface{}{
-					"host":       c.Request().Host,
-					"path":       c.Path(),
-					"user-agent": c.Request().UserAgent(),
-					"method":     c.Request().Method,
-					"param":      c.Get("request"),
-				},
-				Oup: map[string]interface{}{
-					"status_code": c.Response().Status,
-					"response":    response,
-				},
+				Inp: input,
+				Oup: output,
 			},
 		})
 		return
 	}
+}
+
+// 不带输入输出的日志中间件
+func LoggerNormal(next echo.HandlerFunc) echo.HandlerFunc {
+	return loggerBase(next, false, false)
+}
+
+// 附带输入输出的日志中间件
+func LoggerPlus(next echo.HandlerFunc) echo.HandlerFunc {
+	return loggerBase(next, true, true)
 }
 
 func (w *bodyDumpResponseWriter) Write(b []byte) (int, error) {
