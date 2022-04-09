@@ -16,7 +16,7 @@ type ErrorCode struct {
 
 const (
 	SUCCESS     MessageCode = 10000 // 操作成功 info
-	CHECK       MessageCode = 10001 // 请检查 info
+	CHECK       MessageCode = 10001 // 请检查 warn
 	LIMITERROR  MessageCode = 10002 // 超限 error
 	TIMEOUT     MessageCode = 10003 // 超时 error
 	SUPWARN     MessageCode = 10004 // 补充数据 warn
@@ -35,9 +35,9 @@ const (
 func InitErrorCode() {
 	erc = map[MessageCode]ErrorCode{
 		SUCCESS:     {Code: SUCCESS, Level: INFO, Label: "操作成功"},
-		CHECK:       {Code: CHECK, Level: INFO, Label: "请检查"},
-		LIMITERROR:  {Code: LIMITERROR, Level: INFO, Label: "超限"},
-		TIMEOUT:     {Code: TIMEOUT, Level: INFO, Label: "超时"},
+		CHECK:       {Code: CHECK, Level: WARN, Label: "请检查"},
+		LIMITERROR:  {Code: LIMITERROR, Level: ERROR, Label: "超限"},
+		TIMEOUT:     {Code: TIMEOUT, Level: ERROR, Label: "超时"},
 		SUPWARN:     {Code: SUPWARN, Level: WARN, Label: "补充数据"},
 		STATUSERROR: {Code: STATUSERROR, Level: ERROR, Label: "非常规状态码"},
 		EDERROR:     {Code: EDERROR, Level: ERROR, Label: "编码或解码错误"},
