@@ -77,12 +77,12 @@ type Param struct {
 }
 
 // 初始化对象
-func InitRequest(ctx context.Context, name SupportType, option Option) error {
+func InitRequest(ctx context.Context, name SupportType, option Option) logger.ErrorCode {
 	c := request
 	var err error
 	message, err := validate.Work(ctx, &option)
 	if err != nil {
-		return errors.New(message)
+		return logger.ErrorCode{Code: logger.PVERROR, Level: logger.ERROR, Label: message, Name: message}
 	}
 	initBaseComponent(option.LogType, option.LogOption)
 	once.Do(func() {
@@ -92,7 +92,10 @@ func InitRequest(ctx context.Context, name SupportType, option Option) error {
 		}
 		request = c
 	})
-	return err
+	if err != nil {
+		return logger.ErrorCode{Code: logger.PVERROR, Level: logger.ERROR, Label: err.Error(), Name: err.Error()}
+	}
+	return logger.GetDefaultErc()
 }
 
 // 抽象工厂
