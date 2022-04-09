@@ -13,7 +13,6 @@ import (
 
 	"github.com/aivencs/magic-box/pkg/kit"
 	"github.com/aivencs/magic-box/pkg/logger"
-	"github.com/aivencs/magic-box/pkg/request"
 	"github.com/aivencs/magic-box/pkg/validate"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -171,20 +170,20 @@ type Header struct {
 func LoggerMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) (err error) {
 		var header Header
-		label := c.Request().URL.Path
 		startT := time.Now()
-		response := request.Result{}
+		response := Result{}
 		// 获取追踪编码
 		ids := c.Request().Header.Values("X-REQUEST-ID")
 		if len(ids) > 0 {
 			header.X_REQUEST_ID = ids[0]
 		}
+		// 创建新的Context
+		ctx := context.WithValue(context.Background(), "trace", header.X_REQUEST_ID)
+		ctx = context.WithValue(ctx, "label", c.Request().URL.Path)
 		// 设置框架的Context
 		c.Set("trace", header.X_REQUEST_ID)
 		c.Set("label", c.Request().URL.Path)
-		// 创建新的 Context
-		ctx := context.WithValue(context.Background(), "trace", c.Get("trace").(string))
-		ctx = context.WithValue(ctx, "label", c.Get("label").(string))
+		c.Set("context", ctx)
 		// 校验追踪编码
 		message, err := validate.Work(context.Background(), &header)
 		if err != nil {
@@ -206,7 +205,7 @@ func LoggerMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 		// 构建日志信息
 		logger.Info(ctx, logger.Message{
 			Text:  response.ErrorCode.Label,
-			Label: label,
+			Label: c.Request().URL.Path,
 			Attr: logger.Attr{
 				Monitor: logger.Monitor{
 					Final:           true,
@@ -222,6 +221,7 @@ func LoggerMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 				},
 				Oup: map[string]interface{}{
 					"status_code": c.Response().Status,
+					"response":    response,
 				},
 			},
 		})
