@@ -210,8 +210,9 @@ func LoggerMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 			Attr: logger.Attr{
 				Monitor: logger.Monitor{
 					Final:           true,
-					Level:           "",
 					ProcessDuration: duration,
+					Code:            response.Code,
+					Level:           logger.GetErc(response.Code, "").Level,
 				},
 				Inp: map[string]interface{}{
 					"host":       c.Request().Host,
