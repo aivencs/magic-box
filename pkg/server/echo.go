@@ -37,7 +37,6 @@ const (
 
 var server Server
 var once sync.Once
-var routerLabel = map[string]string{}
 
 func init() {
 	ctx := context.WithValue(context.Background(), "trace", "init-for-server")
@@ -47,7 +46,6 @@ func init() {
 type Server interface {
 	Work()
 	AddRouter(payload RouterPayload, h echo.HandlerFunc, m ...echo.MiddlewareFunc)
-	GetRouterLabel(path string) string
 }
 
 type EchoServer struct {
@@ -132,11 +130,6 @@ func (c *EchoServer) AddRouter(payload RouterPayload, h echo.HandlerFunc, m ...e
 	default:
 		c.Kernel.GET(payload.Path, h, m...)
 	}
-	routerLabel[payload.Path] = payload.Label
-}
-
-func (c *EchoServer) GetRouterLabel(path string) string {
-	return routerLabel[path]
 }
 
 func Work() {
@@ -145,10 +138,6 @@ func Work() {
 
 func AddRouter(payload RouterPayload, h echo.HandlerFunc, m ...echo.MiddlewareFunc) {
 	server.AddRouter(payload, h, m...)
-}
-
-func GetRouterLabel(path string) string {
-	return server.GetRouterLabel(path)
 }
 
 type bodyDumpResponseWriter struct {
@@ -182,36 +171,38 @@ type Header struct {
 func LoggerMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) (err error) {
 		var header Header
-		label := server.GetRouterLabel(c.Request().URL.Path)
-		// 获取并校验追踪编码
+		label := c.Request().URL.Path
+		startT := time.Now()
+		response := request.Result{}
+		// 获取追踪编码
 		ids := c.Request().Header.Values("X-REQUEST-ID")
 		if len(ids) > 0 {
 			header.X_REQUEST_ID = ids[0]
 		}
-		message, err := validate.Work(context.Background(), &header)
-		if err != nil {
-			c.Set("message", message)
-			EmptyHandler(c)
-			return
-		}
 		// 设置框架的Context
 		c.Set("trace", header.X_REQUEST_ID)
-		c.Set("label", label)
+		c.Set("label", c.Request().URL.Path)
 		// 创建新的 Context
-		ctx := context.WithValue(context.Background(), "trace", header.X_REQUEST_ID)
-		ctx = context.WithValue(ctx, "label", label)
-		// 拦截响应
-		responseBuffer := new(bytes.Buffer)
-		mw := io.MultiWriter(c.Response().Writer, responseBuffer)
-		writer := &bodyDumpResponseWriter{Writer: mw, ResponseWriter: c.Response().Writer}
-		response := request.Result{}
-		c.Response().Writer = writer
-		// 函数调用
-		startT := time.Now()
-		err = next(c)
+		ctx := context.WithValue(context.Background(), "trace", c.Get("trace").(string))
+		ctx = context.WithValue(ctx, "label", c.Get("label").(string))
+		// 校验追踪编码
+		message, err := validate.Work(context.Background(), &header)
+		if err != nil {
+			// 通过调用空接口避免接口和日志输出不统一
+			c.Set("message", message)
+			EmptyHandler(c)
+		} else {
+			// 拦截响应
+			responseBuffer := new(bytes.Buffer)
+			mw := io.MultiWriter(c.Response().Writer, responseBuffer)
+			writer := &bodyDumpResponseWriter{Writer: mw, ResponseWriter: c.Response().Writer}
+			c.Response().Writer = writer
+			// 调用目标接口
+			err = next(c)
+			// 解析响应内容
+			json.Unmarshal(responseBuffer.Bytes(), &response)
+		}
 		duration := time.Since(startT).Milliseconds()
-		// 解析响应内容
-		json.Unmarshal(responseBuffer.Bytes(), &response)
 		// 构建日志信息
 		logger.Info(ctx, logger.Message{
 			Text:  response.ErrorCode.Label,
