@@ -144,26 +144,27 @@ type bodyDumpResponseWriter struct {
 	http.ResponseWriter
 }
 
-// 请求结果
-type Result struct {
-	Text       string
-	StatusCode int
-	Response   interface{}
-	ErrorCode  logger.ErrorCode
+// 接口响应结果
+type ServerResponse struct {
+	Code    logger.MessageCode `json:"code"`
+	Trace   string             `json:"trace"`
+	Message string             `json:"message"`
+	Result  interface{}        `json:"result"`
 }
 
 func EmptyHandler(c echo.Context) error {
-	res := Result{
-		Text:       c.Get("message").(string),
-		StatusCode: 200,
-		Response:   nil,
-		ErrorCode:  logger.GetErc(logger.PVERROR, ""),
+	res := ServerResponse{
+		Code:    logger.GetErc(logger.PVERROR, "").Code,
+		Trace:   c.Get("trace").(string),
+		Message: c.Get("message").(string),
+		Result:  nil,
 	}
+
 	return c.JSONPretty(http.StatusOK, res, "")
 }
 
 type Header struct {
-	X_REQUEST_ID string `json:"X-REQUEST-ID" label:"追踪编码" validate:"required,min=16"`
+	X_REQUEST_ID string `json:"X-REQUEST-ID" label:"追踪编码" validate:"required,min=16,max=100"`
 }
 
 // 日志中间件
@@ -171,7 +172,7 @@ func LoggerMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) (err error) {
 		var header Header
 		startT := time.Now()
-		response := Result{}
+		response := ServerResponse{}
 		// 获取追踪编码
 		ids := c.Request().Header.Values("X-REQUEST-ID")
 		if len(ids) > 0 {
@@ -204,12 +205,12 @@ func LoggerMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 		duration := time.Since(startT).Milliseconds()
 		// 构建日志信息
 		logger.Info(ctx, logger.Message{
-			Text:  response.ErrorCode.Label,
+			Text:  response.Message,
 			Label: c.Request().URL.Path,
 			Attr: logger.Attr{
 				Monitor: logger.Monitor{
 					Final:           true,
-					Level:           response.ErrorCode.Level,
+					Level:           "",
 					ProcessDuration: duration,
 				},
 				Inp: map[string]interface{}{

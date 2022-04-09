@@ -11,7 +11,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/aivencs/magic-box/pkg/logger"
-	"github.com/aivencs/magic-box/pkg/server"
 	"github.com/aivencs/magic-box/pkg/validate"
 	"github.com/go-resty/resty/v2"
 )
@@ -49,8 +48,16 @@ func init() {
 }
 
 type Request interface {
-	Get(ctx context.Context, param Param) (server.Result, error)
-	Post(ctx context.Context, param Param) (server.Result, error)
+	Get(ctx context.Context, param Param) (Result, error)
+	Post(ctx context.Context, param Param) (Result, error)
+}
+
+// 请求结果
+type Result struct {
+	Text       string
+	StatusCode int
+	Response   interface{}
+	ErrorCode  logger.ErrorCode
 }
 
 // 初始化时所用参数
@@ -101,23 +108,23 @@ func NewRestyRequest(ctx context.Context, option Option) Request {
 	return &RestyRequest{}
 }
 
-func (c *RestyRequest) Get(ctx context.Context, param Param) (server.Result, error) {
+func (c *RestyRequest) Get(ctx context.Context, param Param) (Result, error) {
 	return c.work(ctx, param)
 }
 
-func (c *RestyRequest) Post(ctx context.Context, param Param) (server.Result, error) {
+func (c *RestyRequest) Post(ctx context.Context, param Param) (Result, error) {
 	return c.work(ctx, param)
 }
 
-func (c *RestyRequest) work(ctx context.Context, param Param) (server.Result, error) {
+func (c *RestyRequest) work(ctx context.Context, param Param) (Result, error) {
 	erc := logger.GetDefaultErc()
-	var result server.Result
+	var result Result
 	var response *resty.Response
 	var err error
 	// 参数校验
 	message, err := validate.Work(ctx, param)
 	if err != nil {
-		return server.Result{}, errors.New(message)
+		return Result{}, errors.New(message)
 	}
 	// 前期准备
 	serviceSafeString, _ := url.Parse(param.Link)
@@ -196,7 +203,7 @@ func (c *RestyRequest) work(ctx context.Context, param Param) (server.Result, er
 		}
 	}
 	// 构造结果并返回
-	return server.Result{
+	return Result{
 		Text:       response.String(),
 		StatusCode: response.RawResponse.StatusCode,
 		Response:   response,
@@ -205,13 +212,13 @@ func (c *RestyRequest) work(ctx context.Context, param Param) (server.Result, er
 }
 
 // 暴露给外部调用
-func Get(ctx context.Context, param Param) (server.Result, error) {
+func Get(ctx context.Context, param Param) (Result, error) {
 	param.Method = GET
 	return request.Get(ctx, param)
 }
 
 // 暴露给外部调用
-func Post(ctx context.Context, param Param) (server.Result, error) {
+func Post(ctx context.Context, param Param) (Result, error) {
 	param.Method = POST
 	return request.Get(ctx, param)
 }
