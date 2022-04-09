@@ -35,16 +35,11 @@ var once sync.Once
 // 定义全局请求对象
 var request Request
 
-func init() {
+func initBaseComponent(name logger.SupportType, option logger.Option) {
 	ctx := context.WithValue(context.Background(), "trace", "init-for-request")
 	validate.InitValidate(ctx, "validator", validate.Option{})
 	logger.InitErrorCode()
-	logger.InitLogger(ctx, logger.Zap, logger.Option{
-		Application: "ac",
-		Env:         "dev",
-		Encode:      logger.Json,
-		Label:       "request",
-	})
+	logger.InitLogger(ctx, name, option)
 }
 
 type Request interface {
@@ -62,6 +57,8 @@ type Result struct {
 
 // 初始化时所用参数
 type Option struct {
+	LogType   logger.SupportType `json:"log_type" label:"日志组件" validate:"required"`
+	LogOption logger.Option      `json:"log_option" label:"日志组件参数" validate:"required"`
 }
 
 // 结构体
@@ -83,6 +80,11 @@ type Param struct {
 func InitRequest(ctx context.Context, name SupportType, option Option) error {
 	c := request
 	var err error
+	message, err := validate.Work(ctx, &option)
+	if err != nil {
+		return errors.New(message)
+	}
+	initBaseComponent(option.LogType, option.LogOption)
 	once.Do(func() {
 		c = RequestFactory(ctx, name, option)
 		if c == nil {
